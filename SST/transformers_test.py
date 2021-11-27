@@ -14,7 +14,7 @@ def question_answering(split):
         validation = load_dataset("glue", name=task, split='validation')
         question, context, label = validation['question'], validation['sentence'], validation['label']
 
-    test = classifier(question=question[0], context=context[0])
+    """test = classifier(question=question[0], context=context[0])
     print(test)
     print(label[0])
 
@@ -28,23 +28,26 @@ def question_answering(split):
 
     test = classifier(question=question[3], context=context[3])
     print(test)
-    print(label[3])
+    print(label[3])"""
 
     for i in range(len(question[0:10])):
         pred = []
         sent = classifier(question=question[i], context=context[i])
         pred.append(sent['score'])
         print(pred, ' --> ', label[i])
+        
+    # TODO: figure out the question 'score' output to correctly label as 'entailment' or 'non_entailment'
 
     # 0 == entailment ( < 0.5 ): 1 == not_entailment ( > 0.5 )
 
 
-# function to perform sentiment analysis on GLUE dataset using transformers pipeline
+# function to perform sentiment analysis on GLUE SST dataset using transformers pipeline
 def sentiment_analysis(split):
     # get name of task and define transformer pipeline
     task = glue_tasks[7]
     classifier = pipeline("sentiment-analysis")
 
+    # use either train or validation split (validation split works much faster)
     if split == 'train':
         train = load_dataset("glue", name=task, split='train')
         sentences, labels = train['sentence'], train['label']
@@ -53,6 +56,7 @@ def sentiment_analysis(split):
         validation = load_dataset("glue", name=task, split='validation')
         sentences, labels = validation['sentence'], validation['label']
 
+    # loop to perfrom sentiment analysis using transformers pipeline
     correct_labels = 0
     for i in range(len(sentences)):
         pred = []
@@ -63,21 +67,27 @@ def sentiment_analysis(split):
         if labels[i] == pred[0]:
             correct_labels += 1
 
+    # output accuracy
     accuracy = correct_labels / len(sentences)
     print(f'\nAccuracy: {accuracy*100:0.3f}%')
 
 
 # function to select a GLUE dataset and perform the given task
 def transformer_selection(dataset, split):
+    
+    # Stanford Sentiment Treebank
     if dataset == 'sst2':
         print('\nUsing pre-defined transformer for sentiment analysis on Stanford Sentiment Treebank\n')
         sentiment_analysis(split)
 
+    # Question NLI
     if dataset == 'qnli':
         question_answering(split)
 
 
 if __name__ == '__main__':
-    #transformer_selection('sst2', 'validation')
-    transformer_selection('qnli', 'validation')
+    # Stanford Sentiment Treebank (validation split is faster)
+    transformer_selection('sst2', 'validation')
+    
+    #transformer_selection('qnli', 'validation')
 
