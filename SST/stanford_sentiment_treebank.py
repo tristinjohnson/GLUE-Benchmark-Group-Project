@@ -7,16 +7,11 @@ from tqdm import tqdm
 import numpy as np
 
 # num of epochs
-epochs = 10
+epochs = 2
 
 # specify glue task and get metric
 task = "sst2"
 metric = load_metric("glue", task)
-
-#dataset = load_dataset("glue", task)
-#train = dataset['train']
-#validation = dataset['validation']
-#test = dataset['test']
 
 # training and validation data
 train = load_dataset("glue", name=task, split='train[0:6734]')  # train[0:6734]
@@ -110,38 +105,3 @@ for epoch in range(epochs):
             pbar.set_postfix_str(f"Loss: {val_loss / val_steps}")
 
     print('Validation Accuracy: ', metric.compute(predictions=predictions, references=batch["labels"]))
-
-
-"""num_labels = 2
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=num_labels)
-
-model_name = checkpoint.split("-")[-1]
-
-batch_size = 128
-args = TrainingArguments(f'{model_name}-finetuned-{task}',
-                         evaluation_strategy="epoch",
-                         save_strategy="epoch",
-                         learning_rate=0.01,
-                         per_device_train_batch_size=batch_size,
-                         per_device_eval_batch_size=batch_size,
-                         num_train_epochs=5,
-                         weight_decay=0.1,
-                         load_best_model_at_end=True,
-                         metric_for_best_model='accuracy',
-                         push_to_hub=False)
-
-
-def compute_metrics(eval_predictions):
-    predictions, labels = eval_predictions
-    predictions = np.argmax(predictions, axis=1)
-
-    return metric.compute(predictions=predictions, references=labels)
-
-
-validation_key = 'validation'
-trainer = Trainer(model, args, train_dataset=encoded['train'], eval_dataset=encoded['validation'],
-                  tokenizer=tokenizer, compute_metrics=compute_metrics)
-
-
-#trainer.train()
-"""
