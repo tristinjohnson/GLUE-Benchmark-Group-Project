@@ -105,3 +105,5 @@ for epoch in range(epochs):
             pbar.set_postfix_str(f"Loss: {val_loss / val_steps}")
 
     print('Validation Accuracy: ', metric.compute(predictions=predictions, references=batch["labels"]))
+
+# testing push to github
