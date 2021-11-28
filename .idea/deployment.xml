@@ -5,7 +5,7 @@
       <paths name="ubuntu@34.125.118.255:22">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/ubuntu/NLP/Final_Project/SST" local="$PROJECT_DIR$" />
+            <mapping deploy="/home/ubuntu/NLP/Final_Project" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
