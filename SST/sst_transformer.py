@@ -60,6 +60,7 @@ lr_scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, 
 # train on GPU
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 print('Device: ', device)
+model.to(device)
 
 train_steps, val_steps = 0, 0
 THRESHOLD = 0.5
