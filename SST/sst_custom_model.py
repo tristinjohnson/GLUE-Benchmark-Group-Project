@@ -35,6 +35,7 @@ x_train, y_train = train_df['sentence'].values, train_df['label'].values
 x_test, y_test = validation_df['sentence'].values, validation_df['label'].values
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print('Device: ', device)
 
 
 # function to remove special characters from data
@@ -255,9 +256,4 @@ for epoch in range(num_epochs):
         val_best_acc = acc_val
 
     print('\n' + 25*'==' + '\n')
-
-
-
-
-
 

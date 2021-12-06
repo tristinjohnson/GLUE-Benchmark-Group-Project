@@ -1,6 +1,6 @@
 from datasets import load_dataset, load_metric
 from transformers import AutoTokenizer, DataCollatorWithPadding, AutoModelForSequenceClassification, AdamW
-from transformers import get_scheduler, TrainingArguments, Trainer
+from transformers import get_scheduler, BertTokenizer, BertForSequenceClassification, ElectraTokenizer, ElectraForSequenceClassification
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -15,11 +15,12 @@ metric = load_metric("glue", task)
 
 # training and validation data
 train = load_dataset("glue", name=task, split='train[0:6734]')  # train[0:6734]
-validation = load_dataset("glue", name=task, split='validation[0:200]')
+validation = load_dataset("glue", name=task, split='validation')
 
 # model checkpoint and pretrained tokenizer
 checkpoint = "bert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=True)
+#checkpoint = "google/electra-small-discriminator"
+tokenizer = BertTokenizer.from_pretrained(checkpoint, use_fast=True)
 
 # 6734 - train
 # 87 - test
@@ -50,7 +51,7 @@ train_dataloader = DataLoader(encoded_train, shuffle=True, batch_size=32, collat
 val_dataloader = DataLoader(encoded_validation, batch_size=32, collate_fn=data_collator)
 
 # define model (pretrained) and define optimizer
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
 optimizer = AdamW(model.parameters(), lr=0.0005)
 
 # total number of training steps, and learning rate scheduler
@@ -62,16 +63,14 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 print('Device: ', device)
 model.to(device)
 
-train_steps, val_steps = 0, 0
-THRESHOLD = 0.5
-
 # train the model
 for epoch in range(epochs):
 
-    model.train()
-    pred_logits, real_labels = np.zeros((1, 1)), np.zeros((1, 1))
+    train_steps, val_steps = 0, 0
 
-    with tqdm(total=len(train_dataloader), desc="Training --> ") as pbar:
+    model.train()
+
+    with tqdm(total=len(train_dataloader), desc=f"Training: Epoch {epoch}--> ") as pbar:
         for batch in train_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
@@ -106,3 +105,6 @@ for epoch in range(epochs):
             pbar.set_postfix_str(f"Loss: {val_loss / val_steps}")
 
     print('Validation Accuracy: ', metric.compute(predictions=predictions, references=batch["labels"]))
+
+
+# 0.504 acc
