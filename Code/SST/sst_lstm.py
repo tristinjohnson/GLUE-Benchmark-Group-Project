@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 # define model parameters
 batch_size = 32
-num_epochs = 25
+num_epochs = 10
 num_layers = 2
 output_dim = 1
 embedding_dim = 64
@@ -142,13 +142,6 @@ class SentimentAnalysisLSTM(nn.Module):
         return hidden
 
 
-# function to calculate accuracy
-def accuracy(pred, labels):
-    pred = torch.round(pred.squeeze())
-
-    return torch.sum(pred == labels.squeeze()).item()
-
-
 # define the model
 def model_definition():
     model = SentimentAnalysisLSTM(num_layers, vocab_size, hidden_dim, embedding_dim)
@@ -173,7 +166,8 @@ def train_and_validate(train_loader, validation_loader):
     val_best_acc = 0
 
     for epoch in range(num_epochs):
-        train_loss, steps_train, train_acc = 0, 0, 0
+        train_loss, steps_train = 0, 0
+        corr_train_pred, total_train_pred = 0, 0
 
         model.train()
 
@@ -194,8 +188,10 @@ def train_and_validate(train_loader, validation_loader):
                 train_loss += loss.item()
                 steps_train += 1
 
-                acc = accuracy(output, x_target)
-                train_acc += acc
+                pred = torch.round(output.squeeze())
+
+                corr_train_pred += (pred == x_target).sum().item()
+                total_train_pred += pred.shape[0]
 
                 nn.utils.clip_grad_norm(model.parameters(), clip)
                 loss.backward()
@@ -204,19 +200,20 @@ def train_and_validate(train_loader, validation_loader):
 
                 pbar.update(1)
                 pbar.set_postfix_str(f'Loss: {train_loss / steps_train:0.5f} '
-                                     f'-> Acc: {train_acc / len(train_loader):0.5f}')
+                                     f'-> Acc: {corr_train_pred / total_train_pred:0.5f}')
 
         # get metrics from training
-        avg_loss_train = train_loss / len(train_loader)
-        acc_train = train_acc / len(train_loader)
-        print(f'Training: Epoch {epoch} -> Loss: {avg_loss_train:0.5f} -> Acc: {acc_train:0.5f}')
+        avg_loss_train = train_loss / steps_train
+        av_acc_train = corr_train_pred / total_train_pred
+        print(f'Training: Epoch {epoch} -> Loss: {avg_loss_train:0.5f} -> Acc: {av_acc_train:0.5f}')
 
         # initialize validation hidden layer
         val_h = model.init_hidden(batch_size)
 
         model.eval()
 
-        val_loss, steps_val, val_acc = 0, 0, 0
+        val_loss, steps_val = 0, 0
+        corr_val_pred, total_val_pred = 0, 0
 
         with torch.no_grad():
             with tqdm(total=len(validation_loader), desc=f'Epoch {epoch}: ') as pbar:
@@ -231,23 +228,25 @@ def train_and_validate(train_loader, validation_loader):
                     val_loss += loss.item()
                     steps_val += 1
 
-                    acc = accuracy(output, x_target)
-                    val_acc += acc
+                    pred = torch.round(output.squeeze())
+
+                    corr_val_pred += (pred == x_target).sum().item()
+                    total_val_pred += pred.shape[0]
 
                     pbar.update(1)
                     pbar.set_postfix_str(f'Loss: {val_loss / steps_val:0.5f} '
-                                         f'-> Acc: {val_acc / len(validation_loader)}')
+                                         f'-> Acc: {corr_val_pred / total_val_pred}')
 
         # output validation metrics
-        avg_loss_val = val_loss / len(validation_loader)
-        acc_val = val_acc / len(validation_loader)
-        print(f'Validation: Epoch {epoch} -> Loss: {avg_loss_val:0.5f} -> Acc: {acc_val:0.5f}')
+        avg_loss_val = val_loss / steps_val
+        avg_acc_val = corr_val_pred / total_val_pred
+        print(f'Validation: Epoch {epoch} -> Loss: {avg_loss_val:0.5f} -> Acc: {avg_acc_val:0.5f}')
 
         # save the best model
-        if acc_val > val_best_acc:
+        if avg_acc_val > val_best_acc:
             torch.save(model.state_dict(), 'sst_lstm_model.pt')
             print('The model has been saved!')
-            val_best_acc = acc_val
+            val_best_acc = avg_acc_val
 
         print('\n' + 25*'==' + '\n')
 
@@ -258,7 +257,7 @@ def test_model(test_loader, sentences):
     model, criterion, optimizer, scheduler = model_definition()
     model.load_state_dict(torch.load('sst_lstm_model.pt', map_location=device))
 
-    test_loss, steps_test, test_acc = 0, 0, 0
+    test_loss, steps_test = 0, 0
     test_predictions = []
 
     # initialize hidden layer
@@ -379,3 +378,5 @@ if __name__ == '__main__':
     elif args.split == 'test':
         test_loader, sentences, vocab_size = load_testing_data(task)
         test_model(test_loader, sentences)
+
+# best acc with LSTM - train 0.8681 (0:52 per epoch), val 0.7569 (0:02 per epoch)

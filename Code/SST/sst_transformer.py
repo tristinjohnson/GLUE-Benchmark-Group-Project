@@ -298,3 +298,5 @@ if __name__ == '__main__':
     # train the model
     train_and_test(train_loader, val_loader)
 
+# best acc with BERT - train 0.54935 (15:27 per epoch), val 0.50917 (0:06 per epoch)
+#
