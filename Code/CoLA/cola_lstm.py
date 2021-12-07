@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 # define model parameters
 batch_size = 32
-num_epochs = 25
+num_epochs = 7
 num_layers = 2
 output_dim = 1
 embedding_dim = 64
@@ -276,8 +276,8 @@ def test_model(test_loader, sentences):
                 test_loss += loss.item()
                 steps_test += 1
 
+                # get predictions and append them to list
                 pred = torch.round(output.squeeze())
-
                 test_predictions.append(pred.detach().cpu().numpy())
 
                 pbar.update(1)
@@ -340,7 +340,7 @@ def load_testing_data(task):
     # and if you look at this function, y_test variable does nothing
     # with one-hot encoding the test set
     x_test, y_test = test_df['sentence'].values, test_df['label'].values
-    sentences = test_df['sentence'][0:1792].values
+    sentences = test_df['sentence'][0:1056].values
 
     # tokenzie and one-hot encode test set and get the vocab
     x_test, vocab = tokenize_and_onehot_encode(x_test, y_test, 'test')
