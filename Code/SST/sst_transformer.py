@@ -19,11 +19,7 @@ validation = load_dataset("glue", name=task, split='validation')
 
 # model checkpoint and pretrained tokenizer
 checkpoint = "bert-base-uncased"
-#checkpoint = "google/electra-small-discriminator"
 tokenizer = BertTokenizer.from_pretrained(checkpoint, use_fast=True)
-
-# 6734 - train
-# 87 - test
 
 
 # function to tokenize the sentence in dataset
@@ -107,4 +103,3 @@ for epoch in range(epochs):
     print('Validation Accuracy: ', metric.compute(predictions=predictions, references=batch["labels"]))
 
 
-# 0.504 acc

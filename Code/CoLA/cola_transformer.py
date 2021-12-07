@@ -92,7 +92,6 @@ model = BertForSequenceClassification.from_pretrained(checkpoint,
 model.to(device)
 
 optimizer = AdamW(model.parameters(), lr=2e-5, eps=1e-8)
-
 total_steps = len(train_dataloader) * num_epochs
 scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
@@ -112,43 +111,49 @@ torch.cuda.manual_seed_all(seed)
 training_stats = []
 
 for epoch in range(num_epochs):
-    train_loss, train_steps, train_acc = 0, 0, 0
+    train_loss_total, train_steps, train_acc = 0, 0, 0
 
     model.train()
 
     with tqdm(total=len(train_dataloader), desc='Training --> ') as pbar:
 
-        for step, batch in enumerate(train_dataloader):
+        #for step, batch in enumerate(train_dataloader):
+        for batch in train_dataloader:
 
-            b_input_ids = batch[0].to(device)
-            b_input_mask = batch[1].to(device)
-            b_labels = batch[2].to(device)
+            #b_input_ids = batch[0].to(device)
+            #b_input_mask = batch[1].to(device)
+            #b_labels = batch[2].to(device)
 
-            model.zero_grad()
+            #model.zero_grad()
 
-            loss, logits = model(b_input_ids,
+            """loss, logits = model(b_input_ids,
                                  token_type_ids=None,
                                  attention_mask=b_input_mask,
-                                 labels=b_labels)
+                                 labels=b_labels)"""
 
-            train_loss += loss.item()
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            train_loss = outputs.loss
+            train_loss.backward()
+
+            #train_loss += loss.item()
+            train_loss_total += train_loss
             train_steps += 1
 
-            loss.backward()
+            #loss.backward()
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-            optimizer.step()
-            scheduler.step()
+            #logits = logits.detach().cpu().numpy()
+            #label_ids = b_labels.to('cpu').numpy()
 
-            logits = logits.detach().cpu().numpy()
-            label_ids = b_labels.to('cpu').numpy()
-
-            train_acc += accuracy(logits, label_ids)
+            #train_acc += accuracy(logits, label_ids)
 
             pbar.update()
-            pbar.set_postfix_str(f'Loss: {train_loss / train_steps} '
-                                 f'-> Acc: {train_acc / train_steps}')
+            pbar.set_postfix_str(f'Loss: {train_loss_total / train_steps}')
 
     avg_train_loss = train_loss / len(train_dataloader)
     avg_train_acc = train_acc / len(train_dataloader)

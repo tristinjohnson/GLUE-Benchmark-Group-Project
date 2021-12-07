@@ -26,7 +26,7 @@ num_layers = 2
 output_dim = 1
 embedding_dim = 64
 hidden_dim = 256
-max_len = 256
+max_len = 128
 
 
 # function to remove special characters from data
@@ -245,7 +245,7 @@ def train_and_validate(train_loader, validation_loader):
 
         # save the best model
         if acc_val > val_best_acc:
-            torch.save(model.state_dict(), 'sst_lstm_model.pt')
+            torch.save(model.state_dict(), 'cola_lstm_model.pt')
             print('The model has been saved!')
             val_best_acc = acc_val
 
@@ -256,7 +256,7 @@ def train_and_validate(train_loader, validation_loader):
 def test_model(test_loader, sentences):
     # load the model from training/validation
     model, criterion, optimizer, scheduler = model_definition()
-    model.load_state_dict(torch.load('sst_lstm_model.pt', map_location=device))
+    model.load_state_dict(torch.load('cola_lstm_model.pt', map_location=device))
 
     test_loss, steps_test, test_acc = 0, 0, 0
     test_predictions = []
@@ -292,12 +292,12 @@ def test_model(test_loader, sentences):
     test_pred = np.concatenate(test_predictions)
     results_df['model_predictions'] = test_pred
 
-    results_df.to_excel('sst_model_results.xlsx', index=False)
+    results_df.to_excel('cola_model_results.xlsx', index=False)
 
-    print('\n Your model predictions have been saved to an excel file in this directory --> sst_model_results.xlsx')
+    print('\n Your model predictions have been saved to an excel file in this directory --> cola_model_results.xlsx')
 
 
-# load the training data, perform preprocessing, and return training/validation DataLoaders and vocab
+# load the data for training and validation, and preprocess dataset
 def load_training_data(task):
     # load training and validation set
     train = load_dataset("glue", name=task, split='train')  # 67328
@@ -328,7 +328,7 @@ def load_training_data(task):
     return train_loader, validation_loader, vocab_size
 
 
-# load in testing data, preprocess dataset, return test DataLoader, sentences for results.xlsx, and vocab
+# load testing data to test the model, and preprocess testing dataset
 def load_testing_data(task):
     # load testing data
     test = load_dataset("glue", name=task, split='test')
@@ -358,14 +358,16 @@ def load_testing_data(task):
     return test_loader, sentences, vocab_size
 
 
+# main
 if __name__ == '__main__':
-    # define task name --> SST
-    task = "sst2"
+    # define task name --> CoLA
+    task = "cola"
 
     # use GPU if available
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Device: ', device)
 
+    # add flags
     parser = argparse.ArgumentParser()
     parser.add_argument('--split', default='train_and_validate', type=str, help="the split you would like to apply")
     args = parser.parse_args()
