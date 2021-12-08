@@ -1,5 +1,6 @@
 """
 Tristin Johnson
+GLUE Dataset - Corpus of Linguistic Acceptability (CoLA)
 DATS 6450 - NLP
 December 9th, 2021
 """
@@ -22,7 +23,7 @@ warnings.filterwarnings('ignore')
 
 # define model parameters
 batch_size = 32
-num_epochs = 7
+num_epochs = 20
 num_layers = 2
 output_dim = 1
 embedding_dim = 64
@@ -92,20 +93,25 @@ def padding(sents, sequence_len):
     return features
 
 
-# class to apply Sentiment Analysis using LSTM
-class SentimentAnalysisLSTM(nn.Module):
+# class to apply Linguistic Acceptability using LSTM
+class LinguisticAcceptabilityLSTM(nn.Module):
     def __init__(self, num_layers, vocab_size, hidden_dim, embedding_dim):
-        super(SentimentAnalysisLSTM, self).__init__()
+        super(LinguisticAcceptabilityLSTM, self).__init__()
 
+        # define LSTM parameters
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.vocab_size = vocab_size
 
+        # define architecture
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
 
-        self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=self.hidden_dim,
-                            num_layers=num_layers, batch_first=True)
+        self.lstm1 = nn.LSTM(input_size=embedding_dim, hidden_size=self.hidden_dim,
+                             num_layers=num_layers, batch_first=True)
+
+        self.lstm2 = nn.LSTM(input_size=embedding_dim, hidden_size=self.hidden_dim,
+                             num_layers=num_layers, batch_first=True)
 
         self.dropout = nn.Dropout(0.3)
 
@@ -113,16 +119,18 @@ class SentimentAnalysisLSTM(nn.Module):
 
         self.act = nn.Sigmoid()
 
+    # forward propagation
     def forward(self, x, hidden):
         batch_size = x.size(0)
 
         embeds = self.embedding(x)
 
-        lstm_out, hidden = self.lstm(embeds, hidden)
+        lstm_out, hidden1 = self.lstm1(embeds, hidden)
+        lstm_out2, hidden2 = self.lstm2(embeds, hidden1)
 
-        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
+        lstm_out2 = lstm_out2.contiguous().view(-1, self.hidden_dim)
 
-        output = self.dropout(lstm_out)
+        output = self.dropout(lstm_out2)
 
         output = self.linear(output)
 
@@ -134,6 +142,7 @@ class SentimentAnalysisLSTM(nn.Module):
 
         return act_output, hidden
 
+    # initialize hidden layers
     def init_hidden(self, batch_size):
         h0 = torch.zeros((self.num_layers, batch_size, self.hidden_dim)).to(device)
         c0 = torch.zeros((self.num_layers, batch_size, self.hidden_dim)).to(device)
@@ -145,7 +154,7 @@ class SentimentAnalysisLSTM(nn.Module):
 
 # define the model
 def model_definition():
-    model = SentimentAnalysisLSTM(num_layers, vocab_size, hidden_dim, embedding_dim)
+    model = LinguisticAcceptabilityLSTM(num_layers, vocab_size, hidden_dim, embedding_dim)
     model.to(device)
 
     print(model)
@@ -188,9 +197,6 @@ def train_and_validate(train_loader, validation_loader):
 
                 train_loss += loss.item()
                 steps_train += 1
-
-                #acc = accuracy(output, x_target)
-                #train_acc += acc
 
                 pred = torch.round(output.squeeze())
 
@@ -301,9 +307,9 @@ def test_model(test_loader, sentences):
     test_pred = np.concatenate(test_predictions)
     results_df['model_predictions'] = test_pred
 
-    results_df.to_excel('cola_model_results.xlsx', index=False)
+    results_df.to_excel('cola_lstm_model_submission.xlsx', index=False)
 
-    print('\n Your model predictions have been saved to an excel file in this directory --> cola_model_results.xlsx')
+    print('\n Your model predictions have been saved to an excel file in this directory --> cola_lstm_model_submission.xlsx')
 
 
 # load the data for training and validation, and preprocess dataset
@@ -391,4 +397,4 @@ if __name__ == '__main__':
         test_loader, sentences, vocab_size = load_testing_data(task)
         test_model(test_loader, sentences)
 
-# best acc with LSTM - train 0.88577 (0:05 per epoch), val - 0.69238 (0:01 per epoch), mcc - 0.0871
+# best acc with LSTM - train 0.88577 (0:07 per epoch), val - 0.69238 (0:01 per epoch), mcc - 0.11951
