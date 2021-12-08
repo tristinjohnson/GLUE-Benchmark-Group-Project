@@ -1,7 +1,6 @@
 from datasets import load_dataset, load_metric
-from transformers import (BertTokenizerFast, BertForSequenceClassification,
-                          ElectraTokenizerFast, ElectraForSequenceClassification,
-                          XLMRobertaTokenizerFast, XLMRobertaForSequenceClassification)
+from transformers import (ElectraTokenizerFast, ElectraForSequenceClassification,
+                          AlbertTokenizerFast, AlbertForSequenceClassification)
 from transformers import Trainer, TrainingArguments, DataCollatorWithPadding
 import numpy as np
 import argparse
@@ -11,24 +10,18 @@ task = "sst2"
 sst = load_dataset("glue", name=task)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', default='bert', type=str, help="select a pretrained model: "
-                                                              "['bert', 'electra', 'xlm-roberta']")
+parser.add_argument('--model', default='electra', type=str, help="select a pretrained model: ['electra', 'albert']")
 args = parser.parse_args()
 
-if args.model == 'bert':
-    checkpoint = "bert-base-uncased"
-    tokenizer = BertTokenizerFast.from_pretrained(checkpoint)
-    model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
-
-elif args.model == 'electra':
+if args.model == 'electra':
     checkpoint = 'google/electra-small-discriminator'
     tokenizer = ElectraTokenizerFast.from_pretrained(checkpoint)
     model = ElectraForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
 
-elif args.model == 'xlm-roberta':
-    checkpoint = 'roberta-base'
-    tokenizer = XLMRobertaTokenizerFast.from_pretrained(checkpoint)
-    model = XLMRobertaForSequenceClassification.from_pretrained(checkpoint)
+elif args.model == 'albert':
+    checkpoint = 'albert-base-v2'
+    tokenizer = AlbertTokenizerFast.from_pretrained(checkpoint)
+    model = AlbertForSequenceClassification.from_pretrained(checkpoint)
 
 
 def pretrained_tokenizer(data):
@@ -66,8 +59,7 @@ trainer = Trainer(
     compute_metrics=compute_metrics
 )
 
-# bert          ->   val_acc = %
-# electra       ->   val_acc = 88.18%
-# xlm-roberta   ->   val_acc = %
+# electra  ->   val_acc = 90.137%, 3:52 per epoch
+# albert    ->   val_acc = 86.811%, 11:17 per epoch
 trainer.train()
 
