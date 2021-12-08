@@ -10,7 +10,7 @@ from tqdm import tqdm
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(device)
 # Set batch size to use for our model
-batch_size = 32
+batch_size = 3200
 # Set learning rate for our models
 learning_rate = 0.0005
 # Epochs for training the model
@@ -40,7 +40,7 @@ label = train['label']
 token_list = []
 seq_list = []
 mask_list = []
-y = []
+#y = []
 
 # Loop through premise and hypothesis, create tokens based on the concatenation of both
 # add_special_tokens=True adds cls_token id to start (101) and sep_token_id (102) to end of each seq 1 and seq 2
@@ -54,19 +54,24 @@ for p, h in zip(premise, hypothesis):
 
 # Turn label into target variable for our model
 # Get label coded using a dictionary
-label_dict = {'entailment': 0,
-              'contradiction': 1,
-              'neutral': 2}
+# label_dict = {'entailment': 0,
+#               'contradiction': 1,
+#               'neutral': 2}
 
-for val in label:
-    y.append(label_dict[val])
-
-y = torch.tensor(y)
+# for val in label:
+#     y.append(label_dict[val])
+y = torch.tensor(label)
 
 # Pad for model
 token_list = pad_sequence(token_list, batch_first=True)
 seq_list = pad_sequence(seq_list, batch_first=True)
 mask_list = pad_sequence(mask_list, batch_first=True)
+
+# print(len(token_list))
+# print(len(seq_list))
+# print(len(mask_list))
+# print(len(y))
+
 data_set = TensorDataset(token_list, mask_list, seq_list, y)
 
 # Load data into batches
@@ -94,10 +99,10 @@ for p, h in zip(premise, hypothesis):
     seq_list.append(torch.tensor(seq_id))
     mask_list.append(torch.tensor(mask_id))
 
-for val in label:
-    y.append(label_dict[val])
+# for val in label:
+#     y.append(label_dict[val])
 
-y = torch.tensor(y)
+y = torch.tensor(label)
 
 # Pad for model
 token_list = pad_sequence(token_list, batch_first=True)
@@ -113,7 +118,7 @@ val_dataloader = DataLoader(data_set, shuffle=True, batch_size=batch_size)
 
 # Create model
 # Model needs tokens, sequence_ids, mask_ids, and label (turned to a factor)
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=3)
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=3).to(device)
 optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 # Learning rate scheduler to improve model performance
@@ -151,14 +156,15 @@ for epoch in range(n_epochs):
             loss.backward()
 
             train_steps += 1
-            lr_scheduler.step()
+
             optimizer.step()
+            lr_scheduler.step()
 
             total_train_loss += loss.item()
             total_train_acc += acc.item()
 
             progbar.update(1)
-            progbar.set_postfix(f"Loss: {total_train_loss / train_steps} ")
+            progbar.set_postfix_str(f"Loss: {total_train_loss / train_steps} ")
 
     train_acc = total_train_acc / len(train_dataloader)
     train_loss = total_train_loss / len(train_dataloader)
@@ -184,7 +190,7 @@ for epoch in range(n_epochs):
             total_val_acc += acc.item()
 
             progbar.update(1)
-            progbar.set_postfix(f"Loss: {total_val_loss / val_steps} ")
+            progbar.set_postfix_str(f"Loss: {total_val_loss / val_steps} ")
 
         val_acc = total_val_acc / len(val_dataloader)
         val_loss = total_val_loss / len(val_dataloader)
