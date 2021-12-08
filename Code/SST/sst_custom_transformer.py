@@ -7,11 +7,13 @@ December 9th, 2021
 from datasets import load_dataset, load_metric
 from transformers import BertTokenizerFast, BertForSequenceClassification
 from transformers import ElectraTokenizerFast, ElectraForSequenceClassification
+from transformers import MobileBertTokenizer, MobileBertForSequenceClassification
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 import pandas as pd
+import argparse
 
 
 # define model parameters
@@ -27,14 +29,14 @@ num_epochs = 5
 def tokenizer_custom_dataset(tokenizer, df):
     token_ids, mask_ids, seg_ids, y = [], [], [], []
 
-    premise_list = df['sentence'].to_list()
+    sent_list = df['sentence'].to_list()
     labels = df['label'].to_list()
 
-    for premise in premise_list:
-        premise_ids = tokenizer.encode(premise, add_special_tokens=False)
-        token_pairs = [tokenizer.cls_token_id] + premise_ids + [tokenizer.sep_token_id]
+    for sent in sent_list:
+        sent_ids = tokenizer.encode(sent, add_special_tokens=False)
+        token_pairs = [tokenizer.cls_token_id] + sent_ids + [tokenizer.sep_token_id]
 
-        premise_len = len(premise_ids)
+        premise_len = len(sent_ids)
 
         attention_mask_ids = torch.tensor([0] * (premise_len + 2))
 
@@ -66,9 +68,9 @@ def rte_acc(pred, labels):
 
 
 # create model definition
-def model_definition():
+def model_definition(transformer):
     # define model
-    model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=num_labels)
+    model = transformer.from_pretrained(checkpoint, num_labels=num_labels)
 
     # define optimizer, scheduler, criterion
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -79,8 +81,8 @@ def model_definition():
 
 
 # train and test the model: save the best model
-def train_and_test(train_loader, val_loader):
-    model, optimizer, scheduler, criterion = model_definition()
+def train_and_test(train_loader, val_loader, transformer):
+    model, optimizer, scheduler, criterion = model_definition(transformer)
 
     model.to(device)
 
@@ -163,7 +165,7 @@ def train_and_test(train_loader, val_loader):
 
         # if val accuracy is better than previous, save the model
         if model_acc > model_best_acc:
-            torch.save(model.state_dict(), 'sst_bert_model.pt')
+            torch.save(model.state_dict(), 'sst_model.pt')
             print('This model has been saved as sst_bert_model.pt !')
 
             model_best_acc = model_acc
@@ -173,6 +175,10 @@ def train_and_test(train_loader, val_loader):
 
 # main
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', default='bert', type=str, help="select any of the model: ['bert', 'electra']")
+    args = parser.parse_args()
+
     # use GPU if available
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Device', device)
@@ -189,8 +195,24 @@ if __name__ == '__main__':
     train_df, val_df = pd.DataFrame(train), pd.DataFrame(validation)
 
     # define transformer tokenizer
-    checkpoint = "bert-base-uncased"
-    tokenizer = BertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
+    if args.model == 'bert':
+        checkpoint = 'bert-base-uncased'
+        tokenizer = BertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
+        transformer = BertForSequenceClassification
+        print('\nUsing BERT Transformer!\n')
+
+    elif args.model == 'electra':
+        checkpoint = "google/electra-small-discriminator"
+        tokenizer = ElectraTokenizerFast.from_pretrained("google/electra-small-discriminator", do_lower_case=True)
+        transformer = ElectraForSequenceClassification
+        print('\nUsing Electra Transformer!\n')
+
+    elif args.model == 'mobile_bert':
+        checkpoint = "google/mobilebert-uncased"
+        tokenizer = MobileBertTokenizer.from_pretrained(checkpoint, do_lower_case=True)
+        transformer = MobileBertForSequenceClassification
+        print('\nUsing MobileBert Transformer!\n')
+
 
     # tokenize datasets
     train_data = tokenizer_custom_dataset(tokenizer, train_df)
@@ -200,7 +222,7 @@ if __name__ == '__main__':
     train_loader, val_loader = get_data_loader(train_data, val_data)
 
     # train the model
-    train_and_test(train_loader, val_loader)
+    train_and_test(train_loader, val_loader, transformer)
 
 # best acc with BERT - train 0.54935 (15:27 per epoch), val 0.50917 (0:06 per epoch)
-#
+# best acc with Electra - train ( per epoch), val ( per epoch)
