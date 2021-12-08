@@ -4,10 +4,10 @@ GLUE Dataset - Stanford Sentiment Treebank (SST)
 DATS 6450 - NLP
 December 9th, 2021
 """
+# import various packages
 from datasets import load_dataset, load_metric
-from transformers import BertTokenizerFast, BertForSequenceClassification
-from transformers import ElectraTokenizerFast, ElectraForSequenceClassification
-from transformers import MobileBertTokenizer, MobileBertForSequenceClassification
+from transformers import (ElectraTokenizerFast, ElectraForSequenceClassification,
+                          AlbertTokenizerFast, AlbertForSequenceClassification)
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.utils.rnn import pad_sequence
@@ -153,10 +153,12 @@ def train_and_test(train_loader, val_loader, transformer):
                     pbar.set_postfix_str(f'Loss: {val_loss / val_steps:0.5f}, '
                                          f'Acc: {corr_val_pred / total_val_pred:0.5f}')
 
+        # output training metrics
         avg_train_loss = train_loss / len(train_loader)
         avg_train_acc = corr_train_pred / total_train_pred
         print(f'\nEpoch {epoch} Training Results: Loss: {avg_train_loss:0.5f}, Acc: {avg_train_acc:0.5f}')
 
+        # output validation metrics
         avg_val_loss = val_loss / len(train_loader)
         avg_val_acc = corr_val_pred / total_val_pred
         print(f'Epoch {epoch} Validation Results: Loss: {avg_val_loss:0.5f}, Acc: {avg_val_acc:0.5f}')
@@ -165,8 +167,8 @@ def train_and_test(train_loader, val_loader, transformer):
 
         # if val accuracy is better than previous, save the model
         if model_acc > model_best_acc:
-            torch.save(model.state_dict(), 'sst_model.pt')
-            print('This model has been saved as sst_bert_model.pt !')
+            torch.save(model.state_dict(), 'sst_best_model.pt')
+            print('This model has been saved as sst_best_model.pt !')
 
             model_best_acc = model_acc
 
@@ -175,8 +177,9 @@ def train_and_test(train_loader, val_loader, transformer):
 
 # main
 if __name__ == '__main__':
+    # model selection
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', default='bert', type=str, help="select any of the model: ['bert', 'electra']")
+    parser.add_argument('--model', default='electra', type=str, help="select any of the model: ['albert', 'electra']")
     args = parser.parse_args()
 
     # use GPU if available
@@ -195,23 +198,20 @@ if __name__ == '__main__':
     train_df, val_df = pd.DataFrame(train), pd.DataFrame(validation)
 
     # define transformer tokenizer
-    if args.model == 'bert':
-        checkpoint = 'bert-base-uncased'
-        tokenizer = BertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
-        transformer = BertForSequenceClassification
-        print('\nUsing BERT Transformer!\n')
-
-    elif args.model == 'electra':
+    if args.model == 'electra':
         checkpoint = "google/electra-small-discriminator"
         tokenizer = ElectraTokenizerFast.from_pretrained("google/electra-small-discriminator", do_lower_case=True)
         transformer = ElectraForSequenceClassification
         print('\nUsing Electra Transformer!\n')
 
-    elif args.model == 'mobile_bert':
-        checkpoint = "google/mobilebert-uncased"
-        tokenizer = MobileBertTokenizer.from_pretrained(checkpoint, do_lower_case=True)
-        transformer = MobileBertForSequenceClassification
-        print('\nUsing MobileBert Transformer!\n')
+    elif args.model == 'albert':
+        checkpoint = "albert-base-v2"
+        tokenizer = AlbertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
+        transformer = AlbertForSequenceClassification
+        print('\nUsing ALBERT Transformer!\n')
+
+    else:
+        print('\n******************** Please enter a valid model: [electra, albert] ********************\n')
 
 
     # tokenize datasets
@@ -224,5 +224,5 @@ if __name__ == '__main__':
     # train the model
     train_and_test(train_loader, val_loader, transformer)
 
-# best acc with BERT - train 0.54935 (15:27 per epoch), val 0.50917 (0:06 per epoch)
-# best acc with Electra - train ( per epoch), val ( per epoch)
+# best acc with ALBERT - train 0.52433 (22:27 per epoch), val 0.50917 (0:16 per epoch)
+# best acc with Electra - train 0.55783 (2:19 per epoch), val 0.51927 (0:03 per epoch)

@@ -1,11 +1,18 @@
+"""
+Tristin Johnson
+GLUE Dataset - Corpus of Linguistic Acceptability (CoLA)
+DATS 6450 - NLP
+December 9th, 2021
+"""
 from datasets import load_dataset, load_metric
-from transformers import BertTokenizerFast, BertForSequenceClassification
-from transformers import ElectraTokenizerFast, ElectraForSequenceClassification
+from transformers import (ElectraTokenizerFast, ElectraForSequenceClassification,
+                          AlbertTokenizerFast, AlbertForSequenceClassification)
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 import pandas as pd
+import argparse
 from sklearn.metrics import matthews_corrcoef
 
 
@@ -22,14 +29,14 @@ num_epochs = 5
 def tokenizer_custom_dataset(tokenizer, df):
     token_ids, mask_ids, seg_ids, y = [], [], [], []
 
-    premise_list = df['sentence'].to_list()
+    sent_list = df['sentence'].to_list()
     labels = df['label'].to_list()
 
-    for premise in premise_list:
-        premise_ids = tokenizer.encode(premise, add_special_tokens=False)
-        token_pairs = [tokenizer.cls_token_id] + premise_ids + [tokenizer.sep_token_id]
+    for sent in sent_list:
+        sent_ids = tokenizer.encode(sent, add_special_tokens=False)
+        token_pairs = [tokenizer.cls_token_id] + sent_ids + [tokenizer.sep_token_id]
 
-        premise_len = len(premise_ids)
+        premise_len = len(sent_ids)
 
         attention_mask_ids = torch.tensor([0] * (premise_len + 2))
 
@@ -61,9 +68,9 @@ def rte_acc(pred, labels):
 
 
 # create model definition
-def model_definition():
+def model_definition(transformer):
     # define model
-    model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=num_labels)
+    model = transformer.from_pretrained(checkpoint, num_labels=num_labels)
 
     # define optimizer, scheduler, criterion
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -74,8 +81,8 @@ def model_definition():
 
 
 # train and test the model: save the best model
-def train_and_test(train_loader, val_loader):
-    model, optimizer, scheduler, criterion = model_definition()
+def train_and_test(train_loader, val_loader, transformer):
+    model, optimizer, scheduler, criterion = model_definition(transformer)
 
     model.to(device)
 
@@ -148,16 +155,17 @@ def train_and_test(train_loader, val_loader):
                     real_labels.append(labels.detach().cpu().numpy())
 
                     metric = load_metric("glue", task)
-                    print(metric.compute(predictions=pred, references=labels))
 
                     pbar.update(1)
                     pbar.set_postfix_str(f'Loss: {val_loss / val_steps:0.5f}, '
                                          f'Acc: {corr_val_pred / total_val_pred:0.5f}')
 
+        # output training metrics
         avg_train_loss = train_loss / len(train_loader)
         avg_train_acc = corr_train_pred / total_train_pred
         print(f'\nEpoch {epoch} Training Results: Loss: {avg_train_loss:0.5f}, Acc: {avg_train_acc:0.5f}')
 
+        # output validation metrics
         avg_val_loss = val_loss / len(train_loader)
         avg_val_acc = corr_val_pred / total_val_pred
         print(f'Epoch {epoch} Validation Results: Loss: {avg_val_loss:0.5f}, Acc: {avg_val_acc:0.5f}')
@@ -166,8 +174,8 @@ def train_and_test(train_loader, val_loader):
 
         # if val accuracy is better than previous, save the model
         if model_acc > model_best_acc:
-            torch.save(model.state_dict(), 'cola_bert_model.pt')
-            print('This model has been saved as cola_bert_model.pt !')
+            torch.save(model.state_dict(), 'cola_best_model.pt')
+            print('This model has been saved as cola_best_model.pt !')
 
             model_best_acc = model_acc
 
@@ -176,6 +184,11 @@ def train_and_test(train_loader, val_loader):
 
 # main
 if __name__ == '__main__':
+    # model selection
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', default='electra', type=str, help="select any of the model: ['albert', 'electra']")
+    args = parser.parse_args()
+
     # use GPU if available
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Device', device)
@@ -192,8 +205,20 @@ if __name__ == '__main__':
     train_df, val_df = pd.DataFrame(train), pd.DataFrame(validation)
 
     # define transformer tokenizer
-    checkpoint = "bert-base-uncased"
-    tokenizer = BertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
+    if args.model == 'electra':
+        checkpoint = "google/electra-small-discriminator"
+        tokenizer = ElectraTokenizerFast.from_pretrained("google/electra-small-discriminator", do_lower_case=True)
+        transformer = ElectraForSequenceClassification
+        print('\nUsing Electra Transformer!\n')
+
+    elif args.model == 'albert':
+        checkpoint = "albert-base-v2"
+        tokenizer = AlbertTokenizerFast.from_pretrained(checkpoint, do_lower_case=True)
+        transformer = AlbertForSequenceClassification
+        print('\nUsing ALBERT Transformer!\n')
+
+    else:
+        print('\n******************** Please enter a valid model: [electra, albert] ********************\n')
 
     # tokenize datasets
     train_data = tokenizer_custom_dataset(tokenizer, train_df)
@@ -203,7 +228,7 @@ if __name__ == '__main__':
     train_loader, val_loader = get_data_loader(train_data, val_data)
 
     # train the model
-    train_and_test(train_loader, val_loader)
+    train_and_test(train_loader, val_loader, transformer)
 
-# best acc with BERT - train 0.69267 (1:17 per epoch), val 0.69128 (0:03 per epoch)
-#
+# best acc with ALBERT - train 0.69150 (1:20 per epoch), val 0.69128 (0:14 per epoch)
+# best acc with Electra - train 0.70120 (0:16 per epoch), val 0.69227 (0:11 per epoch)
