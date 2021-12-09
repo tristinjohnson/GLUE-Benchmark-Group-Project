@@ -31,13 +31,14 @@ def question_sentence_tokenize(df):
     return tokenizer(df['question'], df['sentence'], truncation=True)
 
 data_tokenized = data.map(question_sentence_tokenize, batched=True)
+data_tokenized = data_tokenized.remove_columns(['idx', 'sentence', 'question'])
 
 collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 training_args = TrainingArguments(
     output_dir='qnli_classification_results',
     per_device_train_batch_size=16,
-    num_train_epochs=5,
+    num_train_epochs=2,
     per_device_eval_batch_size=16,
     evaluation_strategy='epoch'
 )
