@@ -13,7 +13,6 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 import pandas as pd
 import argparse
-from sklearn.metrics import matthews_corrcoef
 
 
 # define model parameters
@@ -126,6 +125,7 @@ def train_and_test(train_loader, val_loader, transformer):
         corr_val_pred, total_val_pred = 0, 0
         predictions, real_labels = [], []
 
+        # eval mode
         model.eval()
 
         with torch.no_grad():

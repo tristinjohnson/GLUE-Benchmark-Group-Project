@@ -4,6 +4,7 @@ GLUE Dataset - Stanford Sentiment Treebank (SST)
 DATS 6450 - NLP
 December 9th, 2021
 """
+
 # import various packages
 from datasets import load_dataset, load_metric
 from transformers import (ElectraTokenizerFast, ElectraForSequenceClassification,
@@ -125,6 +126,7 @@ def train_and_test(train_loader, val_loader, transformer):
         val_loss, val_steps = 0, 0
         corr_val_pred, total_val_pred = 0, 0
 
+        # eval mode
         model.eval()
 
         with torch.no_grad():

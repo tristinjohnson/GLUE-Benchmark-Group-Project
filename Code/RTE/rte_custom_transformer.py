@@ -126,6 +126,7 @@ def train_and_test(train_loader, val_loader, transformer):
         val_loss, val_steps = 0, 0
         corr_val_pred, total_val_pred = 0, 0
 
+        # eval mode
         model.eval()
 
         with torch.no_grad():
