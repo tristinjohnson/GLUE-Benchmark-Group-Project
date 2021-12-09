@@ -2,6 +2,7 @@ from datasets import load_dataset, load_metric
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, DataCollatorWithPadding
 from transformers import Trainer, TrainingArguments
 import torch
+import numpy as np
 
 torch.cuda.empty_cache()
 
@@ -18,10 +19,10 @@ print(torch.cuda.memory_summary(device=device, abbreviated=False))
 task = 'qnli'
 
 metric = load_metric('glue', task)
-data = load_dataset('glue', task)
 
-# Look at the data object
-print(data)
+train = load_dataset('glue', task, split='train[0:18000]')
+validation = load_dataset('glue', task, split='validation')
+
 
 # Get model for tokenizing and classification
 checkpoint = 'bert-base-uncased'
@@ -30,16 +31,19 @@ tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=checkpoi
 def question_sentence_tokenize(df):
     return tokenizer(df['question'], df['sentence'], truncation=True)
 
-data_tokenized = data.map(question_sentence_tokenize, batched=True)
-data_tokenized = data_tokenized.remove_columns(['idx', 'sentence', 'question'])
+train_tokenized = train.map(question_sentence_tokenize, batched=True)
+train_tokenized = train_tokenized.remove_columns(['idx', 'sentence', 'question'])
+
+validation_tokenized = validation.map(question_sentence_tokenize, batched=True)
+validation_tokenized = validation_tokenized.remove_columns(['idx', 'sentence', 'question'])
 
 collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 training_args = TrainingArguments(
     output_dir='qnli_classification_results',
-    per_device_train_batch_size=16,
+    per_device_train_batch_size=4,
     num_train_epochs=2,
-    per_device_eval_batch_size=16,
+    per_device_eval_batch_size=4,
     evaluation_strategy='epoch'
 )
 
@@ -48,14 +52,15 @@ sequence_model = AutoModelForSequenceClassification.from_pretrained(checkpoint, 
 def compute_model_metrics(eval_preds):
     metric = load_metric("glue", task)
     logits, labels = eval_preds
-    logits = logits.flatten()
-    return metric.compute(predictions=logits, references=labels)
+    #logits = logits.flatten()
+    predictions = np.argmax(logits, axis=-1)
+    return metric.compute(predictions=predictions, references=labels)
 
 qnli_trainer = Trainer(
     sequence_model,
     training_args,
-    train_dataset=data_tokenized['train'],
-    eval_dataset=data_tokenized['validation'],
+    train_dataset=train_tokenized,
+    eval_dataset=validation_tokenized,
     data_collator=collator,
     tokenizer=tokenizer,
     compute_metrics=compute_model_metrics
