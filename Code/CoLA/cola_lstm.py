@@ -4,6 +4,7 @@ GLUE Dataset - Corpus of Linguistic Acceptability (CoLA)
 DATS 6450 - NLP
 December 9th, 2021
 """
+
 # import various required packages
 from datasets import load_dataset
 import pandas as pd
@@ -375,7 +376,7 @@ def load_testing_data(task):
 
 # main
 if __name__ == '__main__':
-    # define task name --> CoLA
+    # define task name ---> CoLA
     task = "cola"
 
     # use GPU if available

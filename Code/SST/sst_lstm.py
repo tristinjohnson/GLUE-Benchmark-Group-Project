@@ -1,5 +1,6 @@
 """
 Tristin Johnson
+GLUE Dataset - Stanford Sentiment Treebank (SST)
 DATS 6450 - NLP
 December 9th, 2021
 """
