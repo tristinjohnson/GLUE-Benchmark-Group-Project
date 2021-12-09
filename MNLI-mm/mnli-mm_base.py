@@ -3,11 +3,12 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Data
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import numpy as np
 
 # Hyper parameters
-n_epochs = 3
+n_epochs = 2
 learning_rate = 0.0005
-batch_size=32
+batch_size=8
 
 # Check GPU availability
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -23,10 +24,15 @@ task2 = 'mnli_matched'
 task3 = 'mnli_mismatched'
 task4 = 'ax'
 
-mnli = load_dataset('glue', task1, split='train[0:500]')
-matched = load_dataset('glue', task2, split='validation[0:500]')
-mismatched = load_dataset('glue', task3, split='validation[0:500]')
+mnli = load_dataset('glue', task1, split='train[0:8000]')
+matched = load_dataset('glue', task2, split='validation')
+mismatched = load_dataset('glue', task3, split='validation')
 diagnostics = load_dataset('glue', task4, split='test')
+
+print(mnli)
+print(matched)
+print(mismatched)
+print(diagnostics)
 
 # Load BERT model for tokenizing
 checkpoint = 'bert-base-uncased'
@@ -67,6 +73,7 @@ optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 def accuracy(y_pred, y_test):
     acc = (torch.log_softmax(y_pred, dim=1).argmax(dim=1) == y_test).sum().float() / float(y_pred.size(0))
+    #acc = (np.argmax(y_pred, axis=1) == y_test).sum().float() / float(y_pred.size(0))
     return acc
 
 for epoch in range(n_epochs):
@@ -88,6 +95,7 @@ for epoch in range(n_epochs):
             total_train_acc += acc
 
             loss = outputs.loss
+            total_train_loss += loss.item()
             loss.backward()
 
             train_steps += 1
@@ -95,7 +103,7 @@ for epoch in range(n_epochs):
             optimizer.step()
             optimizer.zero_grad()
 
-            total_train_loss += loss.item()
+
 
             progbar.update(1)
             progbar.set_postfix_str(f"Loss: {total_train_loss / train_steps} ")
@@ -117,16 +125,16 @@ for epoch in range(n_epochs):
                 outputs = model(**batch)
                 val_loss = outputs.loss
 
-            logits = outputs.logits
-            predictions = logits #torch.argmax(logits, dim=-1)
+                logits = outputs.logits
+                predictions = logits #torch.argmax(logits, dim=-1)
 
-            val_steps += 1
+                val_steps += 1
 
-            acc = accuracy(predictions, batch['labels'])
-            total_acc += acc
+                acc = accuracy(predictions, batch['labels'])
+                total_acc += acc
 
-            progbar.update(1)
-            progbar.set_postfix_str(f"Loss: {total_acc / val_steps} ")
+                progbar.update(1)
+                #progbar.set_postfix_str(f"Accuracy: {total_acc / val_steps} ")
 
     val_acc = total_acc / val_steps
     print(f'Epoch {epoch + 1}: MNLI Matched val_acc: {val_acc:.4f}')
@@ -141,16 +149,16 @@ for epoch in range(n_epochs):
                 outputs = model(**batch)
                 val_loss = outputs.loss
 
-            logits = outputs.logits
-            predictions = logits #torch.argmax(logits, dim=-1)
+                logits = outputs.logits
+                predictions = logits #torch.argmax(logits, dim=-1)
 
-            val_steps += 1
+                val_steps += 1
 
-            acc = accuracy(predictions, batch['labels'])
-            total_acc += acc
+                acc = accuracy(predictions, batch['labels'])
+                total_acc += acc
 
-            progbar.update(1)
-            progbar.set_postfix_str(f"Loss: {total_acc / val_steps} ")
+                progbar.update(1)
+                progbar.set_postfix_str(f"Accuracy: {total_acc / val_steps} ")
 
     val_acc = total_acc / val_steps
     print(f'Epoch {epoch + 1}: MNLI Mismatched val_acc: {val_acc:.4f}')
