@@ -1,9 +1,10 @@
 """
 Tristin Johnson
-GLUE Dataset - Stanford Sentiment Treebank (SST)
+GLUE Dataset - Corpus of Linguistic Acceptability (CoLA)
 DATS 6450 - NLP
 December 9th, 2021
 """
+
 # import various required packages
 from datasets import load_dataset
 import pandas as pd
@@ -12,6 +13,7 @@ import re
 from nltk.corpus import stopwords
 from collections import Counter
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import matthews_corrcoef
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -27,7 +29,7 @@ num_layers = 2
 output_dim = 1
 embedding_dim = 64
 hidden_dim = 256
-max_len = 256
+max_len = 128
 
 
 # function to remove special characters from data
@@ -92,10 +94,10 @@ def padding(sents, sequence_len):
     return features
 
 
-# class to apply Sentiment Analysis using LSTM
-class SentimentAnalysisLSTM(nn.Module):
+# class to apply Linguistic Acceptability using LSTM
+class LinguisticAcceptabilityLSTM(nn.Module):
     def __init__(self, num_layers, vocab_size, hidden_dim, embedding_dim):
-        super(SentimentAnalysisLSTM, self).__init__()
+        super(LinguisticAcceptabilityLSTM, self).__init__()
 
         # define LSTM parameters
         self.output_dim = output_dim
@@ -141,7 +143,7 @@ class SentimentAnalysisLSTM(nn.Module):
 
         return act_output, hidden
 
-    # initialize hidden layer
+    # initialize hidden layers
     def init_hidden(self, batch_size):
         h0 = torch.zeros((self.num_layers, batch_size, self.hidden_dim)).to(device)
         c0 = torch.zeros((self.num_layers, batch_size, self.hidden_dim)).to(device)
@@ -153,7 +155,7 @@ class SentimentAnalysisLSTM(nn.Module):
 
 # define the model
 def model_definition():
-    model = SentimentAnalysisLSTM(num_layers, vocab_size, hidden_dim, embedding_dim)
+    model = LinguisticAcceptabilityLSTM(num_layers, vocab_size, hidden_dim, embedding_dim)
     model.to(device)
 
     print(model)
@@ -218,6 +220,7 @@ def train_and_validate(train_loader, validation_loader):
 
         val_loss, steps_val = 0, 0
         corr_val_pred, total_val_pred = 0, 0
+        predictions, real_labels = [], []
 
         with torch.no_grad():
             with tqdm(total=len(validation_loader), desc=f'Epoch {epoch}: ') as pbar:
@@ -237,23 +240,28 @@ def train_and_validate(train_loader, validation_loader):
                     corr_val_pred += (pred == x_target).sum().item()
                     total_val_pred += pred.shape[0]
 
+                    predictions.append(pred.detach().cpu().numpy())
+                    real_labels.append(x_target.detach().cpu().numpy())
+
                     pbar.update(1)
                     pbar.set_postfix_str(f'Loss: {val_loss / steps_val:0.5f} '
                                          f'-> Acc: {corr_val_pred / total_val_pred}')
 
         # get metrics from training
         avg_loss_train = train_loss / steps_train
-        av_acc_train = corr_train_pred / total_train_pred
-        print(f'Training: Epoch {epoch} -> Loss: {avg_loss_train:0.5f} -> Acc: {av_acc_train:0.5f}')
+        avg_acc_train = corr_train_pred / total_train_pred
+        print(f'\nTraining: Epoch {epoch} -> Loss: {avg_loss_train:0.5f} -> Acc: {avg_acc_train:0.5f}')
 
         # output validation metrics
+        predictions, real_labels = np.concatenate(predictions), np.concatenate(real_labels)
+        mcc = matthews_corrcoef(real_labels, predictions)
         avg_loss_val = val_loss / steps_val
         avg_acc_val = corr_val_pred / total_val_pred
-        print(f'Validation: Epoch {epoch} -> Loss: {avg_loss_val:0.5f} -> Acc: {avg_acc_val:0.5f}')
+        print(f'Validation: Epoch {epoch} -> Loss: {avg_loss_val:0.5f} -> Acc: {avg_acc_val:0.5f} -> MCC: {mcc:0.5f}')
 
         # save the best model
         if avg_acc_val > val_best_acc:
-            torch.save(model.state_dict(), 'sst_lstm_model.pt')
+            torch.save(model.state_dict(), 'cola_lstm_model.pt')
             print('The model has been saved!')
             val_best_acc = avg_acc_val
 
@@ -264,9 +272,9 @@ def train_and_validate(train_loader, validation_loader):
 def test_model(test_loader, sentences):
     # load the model from training/validation
     model, criterion, optimizer, scheduler = model_definition()
-    model.load_state_dict(torch.load('sst_lstm_model.pt', map_location=device))
+    model.load_state_dict(torch.load('cola_lstm_model.pt', map_location=device))
 
-    test_loss, steps_test = 0, 0
+    test_loss, steps_test, test_acc = 0, 0, 0
     test_predictions = []
 
     # initialize hidden layer
@@ -284,8 +292,8 @@ def test_model(test_loader, sentences):
                 test_loss += loss.item()
                 steps_test += 1
 
+                # get predictions and append them to list
                 pred = torch.round(output.squeeze())
-
                 test_predictions.append(pred.detach().cpu().numpy())
 
                 pbar.update(1)
@@ -300,12 +308,12 @@ def test_model(test_loader, sentences):
     test_pred = np.concatenate(test_predictions)
     results_df['model_predictions'] = test_pred
 
-    results_df.to_excel('sst_lstm_model_submission.xlsx', index=False)
+    results_df.to_excel('cola_lstm_model_submission.xlsx', index=False)
 
-    print('\n Your model predictions have been saved to an excel file in this directory --> sst_lstm_model_results.xlsx')
+    print('\n Your model predictions have been saved to an excel file in this directory --> cola_lstm_model_submission.xlsx')
 
 
-# load the training data, perform preprocessing, and return training/validation DataLoaders and vocab
+# load the data for training and validation, and preprocess dataset
 def load_training_data(task):
     # load training and validation set
     train = load_dataset("glue", name=task, split='train')  # 67328
@@ -336,7 +344,7 @@ def load_training_data(task):
     return train_loader, validation_loader, vocab_size
 
 
-# load in testing data, preprocess dataset, return test DataLoader, sentences for results.xlsx, and vocab
+# load testing data to test the model, and preprocess testing dataset
 def load_testing_data(task):
     # load testing data
     test = load_dataset("glue", name=task, split='test')
@@ -348,7 +356,7 @@ def load_testing_data(task):
     # and if you look at this function, y_test variable does nothing
     # with one-hot encoding the test set
     x_test, y_test = test_df['sentence'].values, test_df['label'].values
-    sentences = test_df['sentence'][0:1792].values
+    sentences = test_df['sentence'][0:1056].values
 
     # tokenzie and one-hot encode test set and get the vocab
     x_test, vocab = tokenize_and_onehot_encode(x_test, y_test, 'test')
@@ -366,14 +374,16 @@ def load_testing_data(task):
     return test_loader, sentences, vocab_size
 
 
+# main
 if __name__ == '__main__':
-    # define task name --> SST
-    task = "sst2"
+    # define task name ---> CoLA
+    task = "cola"
 
     # use GPU if available
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Device: ', device)
 
+    # add flags
     parser = argparse.ArgumentParser()
     parser.add_argument('--split', default='train_and_validate', type=str, help="the split you would like to apply")
     args = parser.parse_args()
@@ -388,4 +398,4 @@ if __name__ == '__main__':
         test_loader, sentences, vocab_size = load_testing_data(task)
         test_model(test_loader, sentences)
 
-# best acc with LSTM - train 0.88419 (0:52 per epoch), val 0.77315 (0:02 per epoch)
+# best acc with LSTM - train 0.88577 (0:07 per epoch), val - 0.69238 (0:01 per epoch), mcc - 0.11951
